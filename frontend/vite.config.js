@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: process.env.VITE_API_URL ? '/lcs-recruiting-portal/' : '/',
+  base: process.env.VITE_API_URL ? '/LCSRecruiting/' : '//',
   server: {
     proxy: {
       '/api': 'http://localhost:3001',
