@@ -2,6 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-light-gray text-gray-800;
+@layer base {
+  * {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-slate-50 text-gray-800;
+  }
+
+  input, select, textarea {
+    @apply font-normal;
+  }
 }
+
+@layer components {
+  .card {
+    @apply bg-white rounded-xl border border-gray-100 shadow-sm;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center gap-2 bg-navy text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#152e57] transition-colors shadow-sm;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center gap-2 bg-gold text-navy px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#b8911f] transition-colors shadow-sm;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 text-gray-600 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors;
+  }
+
+  .input {
+    @apply w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy/60 transition-colors placeholder-gray-400;
+  }
+
+  .select {
+    @apply border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy/60 transition-colors;
+  }
+
+  .badge {
+    @apply inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full;
+  }
+
+  .page-header {
+    @apply flex items-center justify-between mb-8;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold text-gray-900 tracking-tight;
+  }
+
+  .section-title {
+    @apply text-base font-semibold text-gray-900 mb-4;
+  }
+
+  .label {
+    @apply block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-200 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-300;
+}
+
+/* Stage badge colors */
+.stage-initial    { @apply bg-gray-100 text-gray-600; }
+.stage-interested { @apply bg-violet-50 text-violet-700; }
+.stage-lcs        { @apply bg-amber-50 text-amber-700; }
+.stage-sent       { @apply bg-blue-50 text-blue-700; }
+.stage-client     { @apply bg-orange-50 text-orange-700; }
+.stage-offer      { @apply bg-emerald-50 text-emerald-700; }
+.stage-hired      { @apply bg-emerald-100 text-emerald-800; }
+.stage-rejected   { @apply bg-red-50 text-red-700; }
+.stage-withdrawn  { @apply bg-gray-100 text-gray-500; }
