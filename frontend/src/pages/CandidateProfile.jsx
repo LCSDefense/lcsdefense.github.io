@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
 
@@ -16,17 +16,52 @@ export default function CandidateProfile() {
   const isNew = !id;
   const [form, setForm] = useState(EMPTY);
   const [applications, setApplications] = useState([]);
+  const [resumes, setResumes] = useState([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!isNew) {
       api.getCandidate(id).then((data) => {
         setForm(data);
         setApplications(data.applications || []);
+        setResumes(data.resumes || []);
       }).finally(() => setLoading(false));
     }
   }, [id]);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const uploaded = await api.uploadResume(id, file);
+      setResumes((prev) => [uploaded, ...prev]);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteResume = async (resumeId, filename) => {
+    if (!confirm(`Delete "${filename}"?`)) return;
+    try {
+      await api.deleteResume(resumeId);
+      setResumes((prev) => prev.filter((r) => r.id !== resumeId));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const formatBytes = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -140,6 +175,65 @@ export default function CandidateProfile() {
           </button>
         </div>
       </div>
+
+      {!isNew && (
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-navy">Resume Attachments ({resumes.length})</h2>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.odt"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="bg-navy text-white px-4 py-2 rounded-lg hover:bg-navy/90 transition text-sm disabled:opacity-50"
+              >
+                {uploading ? 'Uploading...' : '+ Upload Resume'}
+              </button>
+            </div>
+          </div>
+          {resumes.length === 0 ? (
+            <p className="text-gray-400 text-sm">No resume files uploaded. Click "Upload Resume" to attach a PDF or Word doc.</p>
+          ) : (
+            <div className="space-y-2">
+              {resumes.map((r) => (
+                <div key={r.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-light-gray transition">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{r.mimeType === 'application/pdf' ? '📄' : '📝'}</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{r.filename}</p>
+                      <p className="text-xs text-gray-400">
+                        {formatBytes(r.size)} · Uploaded {new Date(r.uploadedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={api.getResumeUrl(r.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs px-3 py-1 rounded border border-navy text-navy hover:bg-navy hover:text-white transition"
+                    >
+                      View
+                    </a>
+                    <button
+                      onClick={() => handleDeleteResume(r.id, r.filename)}
+                      className="text-xs px-3 py-1 rounded border border-red-300 text-red-500 hover:bg-red-50 transition"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {!isNew && (
         <div className="bg-white rounded-lg shadow-sm p-6">

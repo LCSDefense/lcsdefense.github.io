@@ -35,6 +35,23 @@ export const api = {
   updateCandidate: (id, data) => request(`/api/candidates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteCandidate: (id) => request(`/api/candidates/${id}`, { method: 'DELETE' }),
 
+  // Candidate Resumes
+  getResumes: (candidateId) => request(`/api/candidates/${candidateId}/resumes`),
+  uploadResume: (candidateId, file) => {
+    const formData = new FormData();
+    formData.append('resume', file);
+    return fetch(`${API_BASE}/api/candidates/${candidateId}/resumes`, {
+      method: 'POST',
+      body: formData,
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      return data;
+    });
+  },
+  deleteResume: (resumeId) => request(`/api/candidates/resumes/${resumeId}`, { method: 'DELETE' }),
+  getResumeUrl: (resumeId) => `${API_BASE}/api/candidates/resumes/${resumeId}/file`,
+
   // Applications
   getApplications: (params) => {
     const q = new URLSearchParams(params).toString();

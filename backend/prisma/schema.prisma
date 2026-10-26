@@ -44,6 +44,7 @@ model Candidate {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
   applications          Application[]
+  resumes               CandidateResume[]
 }
 
 model Application {
@@ -133,6 +134,17 @@ model OnboardingRecord {
   createdAt                   DateTime  @default(now())
   updatedAt                   DateTime  @updatedAt
   checklistItems              ChecklistItem[]
+}
+
+model CandidateResume {
+  id          Int       @id @default(autoincrement())
+  candidateId Int
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  filename    String
+  mimeType    String
+  size        Int
+  data        Bytes
+  uploadedAt  DateTime  @default(now())
 }
 
 model ChecklistItem {
