@@ -51,7 +51,7 @@ const NAV_ITEMS = [
   { path: '/resume-scanner', label: 'Resume Scanner', icon: 'Scanner' },
 ];
 
-export default function Layout({ children }) {
+export default function Layout({ children, onLogout }) {
   const location = useLocation();
 
   return (
@@ -102,9 +102,14 @@ export default function Layout({ children }) {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 mx-3 mb-4 rounded-xl bg-white/5 border border-white/5">
-          <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider mb-1">Support</p>
-          <p className="text-xs text-white/50">LCS Defense © {new Date().getFullYear()}</p>
+        <div className="p-4 mx-3 mb-4 rounded-xl bg-white/5 border border-white/5 space-y-2">
+          <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider">LCS Defense © {new Date().getFullYear()}</p>
+          <button
+            onClick={onLogout}
+            className="w-full text-xs text-white/40 hover:text-white/70 transition-colors text-left"
+          >
+            Sign out
+          </button>
         </div>
       </aside>
 

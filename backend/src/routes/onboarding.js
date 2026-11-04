@@ -1,5 +1,27 @@
 const { Router } = require('express');
+const { encrypt, decrypt } = require('../crypto');
 const router = Router();
+
+// Fields encrypted at rest
+const PII_FIELDS = ['ssn', 'dob'];
+
+function encryptPII(data) {
+  if (!data || typeof data !== 'object') return data;
+  const out = { ...data };
+  for (const field of PII_FIELDS) {
+    if (out[field] !== undefined) out[field] = encrypt(out[field]);
+  }
+  return out;
+}
+
+function decryptPII(record) {
+  if (!record || typeof record !== 'object') return record;
+  const out = { ...record };
+  for (const field of PII_FIELDS) {
+    if (out[field] !== undefined) out[field] = decrypt(out[field]);
+  }
+  return out;
+}
 
 const DEFAULT_CHECKLIST = {
   HR: [
@@ -53,16 +75,17 @@ router.get('/', async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
     });
-    res.json(records);
+    res.json(records.map(decryptPII));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to fetch onboarding records' });
   }
 });
 
 // POST /api/onboarding
 router.post('/', async (req, res) => {
   try {
-    const { applicationId, ...rest } = req.body;
+    const { applicationId, ...rawRest } = req.body;
+    const rest = encryptPII(rawRest);
 
     // Build checklist items
     const checklistData = [];
@@ -84,43 +107,47 @@ router.post('/', async (req, res) => {
         checklistItems: { orderBy: { sortOrder: 'asc' } },
       },
     });
-    res.status(201).json(record);
+    res.status(201).json(decryptPII(record));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: 'Failed to create onboarding record' });
   }
 });
 
 // GET /api/onboarding/:id
 router.get('/:id', async (req, res) => {
   try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
     const record = await req.prisma.onboardingRecord.findUnique({
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       include: {
         application: { include: { requisition: true, candidate: true } },
         checklistItems: { orderBy: { sortOrder: 'asc' } },
       },
     });
     if (!record) return res.status(404).json({ error: 'Not found' });
-    res.json(record);
+    res.json(decryptPII(record));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to fetch onboarding record' });
   }
 });
 
 // PUT /api/onboarding/:id
 router.put('/:id', async (req, res) => {
   try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
     const record = await req.prisma.onboardingRecord.update({
-      where: { id: parseInt(req.params.id) },
-      data: req.body,
+      where: { id },
+      data: encryptPII(req.body),
       include: {
         application: { include: { requisition: true, candidate: true } },
         checklistItems: { orderBy: { sortOrder: 'asc' } },
       },
     });
-    res.json(record);
+    res.json(decryptPII(record));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: 'Failed to update onboarding record' });
   }
 });
 

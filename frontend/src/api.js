@@ -1,10 +1,28 @@
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://backend-production-45d16.up.railway.app';
+
+function getToken() {
+  return localStorage.getItem('lcs_token');
+}
+
+export function clearToken() {
+  localStorage.removeItem('lcs_token');
+}
 
 async function request(path, options = {}) {
+  const token = getToken();
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
     ...options,
   });
+  if (res.status === 401) {
+    clearToken();
+    window.location.href = '/'; // Redirect to login
+    throw new Error('Session expired — please sign in again');
+  }
   if (res.status === 204) return null;
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Request failed');

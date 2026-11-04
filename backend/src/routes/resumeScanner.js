@@ -1,56 +1,68 @@
 const { Router } = require('express');
 const multer = require('multer');
 const Anthropic = require('@anthropic-ai/sdk');
-const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 
 const router = Router();
 
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-3-5-haiku-20241022';
 
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+];
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowed = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain',
-    ];
-    if (allowed.includes(file.mimetype) || file.fieldname === 'jobDescFile') cb(null, true);
-    else cb(new Error('Only PDF, Word, or text files allowed'));
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) return cb(null, true);
+    cb(new Error('Only PDF, Word, or text files are allowed'));
   },
 });
 
-// ─── Text extraction helpers ───────────────────────────────────────────────
+// ─── Content preparation ───────────────────────────────────────────────────
+// PDFs go directly to Claude (native PDF support — no extraction needed).
+// DOCX → mammoth text extraction. Plain text → pass through.
 
-async function extractText(buffer, mimetype) {
-  if (!buffer || buffer.length === 0) return '';
+async function prepareContent(buffer, mimetype) {
+  if (!buffer || buffer.length === 0) return { type: 'text', text: '' };
   try {
     if (mimetype === 'application/pdf') {
-      const result = await pdfParse(buffer);
-      return result.text || '';
+      return { type: 'pdf', data: buffer.toString('base64') };
     }
     if (
       mimetype === 'application/msword' ||
       mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     ) {
       const result = await mammoth.extractRawText({ buffer });
-      return result.value || '';
+      return { type: 'text', text: result.value || '' };
     }
-    // plain text
-    return buffer.toString('utf8');
+    return { type: 'text', text: buffer.toString('utf8') };
   } catch (err) {
-    console.error('Text extraction failed:', err.message);
-    return '';
+    console.error('Content prep failed:', err.message);
+    return { type: 'text', text: '' };
   }
 }
 
-// ─── Claude scoring ────────────────────────────────────────────────────────
+// Extract text from JD file (always text — not sent to Claude as a document)
+async function extractText(buffer, mimetype) {
+  const c = await prepareContent(buffer, mimetype);
+  if (c.type === 'pdf') {
+    // For JD PDFs we need text — use mammoth fallback won't work for PDFs,
+    // so we'll return a placeholder and let Claude handle it inline if needed.
+    // Best approach: treat JD PDF as text via a separate Claude call, or just
+    // ask the user to paste. For now return empty so caller can handle.
+    return '';
+  }
+  return c.text;
+}
 
-async function scoreResume(anthropic, jobDescription, resumeText, candidateName) {
-  const systemPrompt = `You are an expert resume screener for a defense contractor staffing company (LCS Defense).
+// ─── Scoring prompt ────────────────────────────────────────────────────────
+
+const SYSTEM_PROMPT = `You are an expert resume screener for a defense contractor staffing company (LCS Defense).
 You evaluate resumes against job descriptions with military precision.
 
 CLEARANCE HIERARCHY (important for scoring):
@@ -76,25 +88,34 @@ Respond ONLY with valid JSON matching this exact schema:
   "summary": string
 }`;
 
-  const userPrompt = `JOB DESCRIPTION:
-${jobDescription}
+async function scoreResume(anthropic, jobDescription, content, candidateName) {
+  let userContent;
 
----
-
-CANDIDATE RESUME ${candidateName ? `(${candidateName})` : ''}:
-${resumeText}
-
-Analyze this resume against the job description and return the JSON evaluation.`;
+  if (content.type === 'pdf') {
+    // Send PDF natively — Claude reads it directly
+    userContent = [
+      {
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: content.data },
+      },
+      {
+        type: 'text',
+        text: `JOB DESCRIPTION:\n${jobDescription}\n\nAnalyze the resume in the document above against this job description and return the JSON evaluation. Candidate name hint: ${candidateName || 'extract from resume'}.`,
+      },
+    ];
+  } else {
+    if (!content.text.trim()) throw new Error('Empty resume content');
+    userContent = `JOB DESCRIPTION:\n${jobDescription}\n\n---\n\nCANDIDATE RESUME${candidateName ? ` (${candidateName})` : ''}:\n${content.text}\n\nAnalyze this resume against the job description and return the JSON evaluation.`;
+  }
 
   const response = await anthropic.messages.create({
     model: CLAUDE_MODEL,
     max_tokens: 1024,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }],
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: userContent }],
   });
 
   const text = response.content[0].text.trim();
-  // Strip markdown code fences if present
   const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
   return JSON.parse(cleaned);
 }
@@ -106,8 +127,10 @@ async function processSession(prisma, sessionId, resumes, jobDescription) {
 
   for (const item of resumes) {
     try {
-      const text = await extractText(item.buffer, item.mimetype);
-      if (!text.trim()) {
+      const content = await prepareContent(item.buffer, item.mimetype);
+      const isEmpty = content.type === 'text' && !content.text.trim();
+
+      if (isEmpty) {
         await prisma.resumeSessionResult.create({
           data: {
             sessionId,
@@ -125,7 +148,7 @@ async function processSession(prisma, sessionId, resumes, jobDescription) {
           },
         });
       } else {
-        const result = await scoreResume(anthropic, jobDescription, text, item.name || '');
+        const result = await scoreResume(anthropic, jobDescription, content, item.name || '');
         await prisma.resumeSessionResult.create({
           data: {
             sessionId,
@@ -163,7 +186,6 @@ async function processSession(prisma, sessionId, resumes, jobDescription) {
       });
     }
 
-    // Update progress
     await prisma.resumeSession.update({
       where: { id: sessionId },
       data: { processedCount: { increment: 1 } },
@@ -178,7 +200,6 @@ async function processSession(prisma, sessionId, resumes, jobDescription) {
 
 // ─── Routes ────────────────────────────────────────────────────────────────
 
-// List all sessions
 router.get('/sessions', async (req, res) => {
   try {
     const sessions = await req.prisma.resumeSession.findMany({
@@ -194,11 +215,12 @@ router.get('/sessions', async (req, res) => {
   }
 });
 
-// Get session with results
 router.get('/sessions/:id', async (req, res) => {
   try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid session ID' });
     const session = await req.prisma.resumeSession.findUnique({
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       include: {
         requisition: { select: { id: true, position: true, customer: true } },
         results: {
@@ -214,17 +236,17 @@ router.get('/sessions/:id', async (req, res) => {
   }
 });
 
-// Delete session
 router.delete('/sessions/:id', async (req, res) => {
   try {
-    await req.prisma.resumeSession.delete({ where: { id: parseInt(req.params.id) } });
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid session ID' });
+    await req.prisma.resumeSession.delete({ where: { id } });
     res.status(204).end();
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-// Create session — upload resumes + job description
 router.post(
   '/sessions',
   upload.fields([{ name: 'resumes', maxCount: 50 }, { name: 'jobDescFile', maxCount: 1 }]),
@@ -237,16 +259,16 @@ router.post(
 
       let jobDescription = jobDescText || '';
       if (jobDescFile) {
-        jobDescription = await extractText(jobDescFile.buffer, jobDescFile.mimetype);
+        const extracted = await extractText(jobDescFile.buffer, jobDescFile.mimetype);
+        if (extracted) jobDescription = extracted;
       }
       if (!jobDescription.trim()) {
-        return res.status(400).json({ error: 'Job description is required' });
+        return res.status(400).json({ error: 'Job description is required (paste text or upload a Word/text file)' });
       }
       if (resumeFiles.length === 0 && !req.body.candidateIds) {
         return res.status(400).json({ error: 'At least one resume is required' });
       }
 
-      // Collect resumes to process
       const toProcess = resumeFiles.map((f) => ({
         buffer: f.buffer,
         mimetype: f.mimetype,
@@ -255,14 +277,11 @@ router.post(
         candidateId: null,
       }));
 
-      // If candidateIds were passed, load their stored resumes
       if (req.body.candidateIds) {
         const ids = JSON.parse(req.body.candidateIds);
         const candidates = await req.prisma.candidate.findMany({
           where: { id: { in: ids } },
-          include: {
-            resumes: { orderBy: { uploadedAt: 'desc' }, take: 1 },
-          },
+          include: { resumes: { orderBy: { uploadedAt: 'desc' }, take: 1 } },
         });
         for (const c of candidates) {
           if (c.resumes.length > 0) {
@@ -293,7 +312,6 @@ router.post(
         },
       });
 
-      // Fire-and-forget background processing
       processSession(req.prisma, session.id, toProcess, jobDescription).catch((err) => {
         console.error('Session processing failed:', err.message);
         req.prisma.resumeSession
@@ -308,11 +326,12 @@ router.post(
   }
 );
 
-// Push a result to pipeline — creates an Application
 router.post('/sessions/:id/results/:resultId/apply', async (req, res) => {
   try {
+    const resultId = parseInt(req.params.resultId);
+    if (isNaN(resultId)) return res.status(400).json({ error: 'Invalid result ID' });
     const result = await req.prisma.resumeSessionResult.findUnique({
-      where: { id: parseInt(req.params.resultId) },
+      where: { id: resultId },
       include: { session: true },
     });
     if (!result) return res.status(404).json({ error: 'Result not found' });
@@ -322,7 +341,6 @@ router.post('/sessions/:id/results/:resultId/apply', async (req, res) => {
 
     let { candidateId } = req.body;
 
-    // If result is not linked to an existing candidate, create one
     if (!candidateId && !result.candidateId) {
       const newCandidate = await req.prisma.candidate.create({
         data: { name: result.candidateName },
@@ -336,7 +354,6 @@ router.post('/sessions/:id/results/:resultId/apply', async (req, res) => {
       candidateId = result.candidateId || parseInt(candidateId);
     }
 
-    // Check if application already exists
     const existing = await req.prisma.application.findFirst({
       where: { candidateId, requisitionId: result.session.requisitionId },
     });

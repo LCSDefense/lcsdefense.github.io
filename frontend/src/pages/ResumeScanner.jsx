@@ -2,6 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const API = import.meta.env.VITE_API_URL || 'https://backend-production-45d16.up.railway.app';
+const authHeaders = () => {
+  const token = localStorage.getItem('lcs_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -192,7 +196,7 @@ function SessionView({ sessionId, onClose }) {
 
   const fetchSession = useCallback(async () => {
     try {
-      const r = await fetch(`${API}/api/resume-scanner/sessions/${sessionId}`);
+      const r = await fetch(`${API}/api/resume-scanner/sessions/${sessionId}`, { headers: authHeaders() });
       const data = await r.json();
       setSession(data);
       return data;
@@ -215,7 +219,7 @@ function SessionView({ sessionId, onClose }) {
     try {
       const r = await fetch(
         `${API}/api/resume-scanner/sessions/${sessionId}/results/${result.id}/apply`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }
+        { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({}) }
       );
       if (!r.ok) {
         const e = await r.json();
@@ -370,7 +374,7 @@ export default function ResumeScanner() {
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/api/requisitions`)
+    fetch(`${API}/api/requisitions`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => setRequisitions(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -379,7 +383,7 @@ export default function ResumeScanner() {
   useEffect(() => {
     if (candidateSource === 'pool') {
       const params = clearanceFilter ? `?clearance=${encodeURIComponent(clearanceFilter)}` : '';
-      fetch(`${API}/api/candidates${params}`)
+      fetch(`${API}/api/candidates${params}`, { headers: authHeaders() })
         .then((r) => r.json())
         .then((data) => setCandidates(Array.isArray(data) ? data : []))
         .catch(() => {});
@@ -389,7 +393,7 @@ export default function ResumeScanner() {
   const loadHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const r = await fetch(`${API}/api/resume-scanner/sessions`);
+      const r = await fetch(`${API}/api/resume-scanner/sessions`, { headers: authHeaders() });
       const data = await r.json();
       setSessions(Array.isArray(data) ? data : []);
     } catch { }
@@ -437,6 +441,7 @@ export default function ResumeScanner() {
 
       const r = await fetch(`${API}/api/resume-scanner/sessions`, {
         method: 'POST',
+        headers: authHeaders(),
         body: form,
       });
 
