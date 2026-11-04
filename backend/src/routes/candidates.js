@@ -14,6 +14,35 @@ const upload = multer({
   },
 });
 
+// --- Resume file routes (must be BEFORE /:id to avoid Express matching 'resumes' as an id) ---
+
+// Download resume file
+router.get('/resumes/:resumeId/file', async (req, res) => {
+  try {
+    const resume = await req.prisma.candidateResume.findUnique({
+      where: { id: parseInt(req.params.resumeId) },
+    });
+    if (!resume) return res.status(404).json({ error: 'Resume not found' });
+    const buf = Buffer.isBuffer(resume.data) ? resume.data : Buffer.from(resume.data);
+    res.setHeader('Content-Type', resume.mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${resume.filename}"`);
+    res.setHeader('Content-Length', buf.length);
+    res.end(buf);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete resume
+router.delete('/resumes/:resumeId', async (req, res) => {
+  try {
+    await req.prisma.candidateResume.delete({ where: { id: parseInt(req.params.resumeId) } });
+    res.status(204).end();
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // List candidates
 router.get('/', async (req, res) => {
   try {
@@ -125,32 +154,6 @@ router.post('/:id/resumes', upload.single('resume'), async (req, res) => {
       size: resume.size,
       uploadedAt: resume.uploadedAt,
     });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// Download resume file
-router.get('/resumes/:resumeId/file', async (req, res) => {
-  try {
-    const resume = await req.prisma.candidateResume.findUnique({
-      where: { id: parseInt(req.params.resumeId) },
-    });
-    if (!resume) return res.status(404).json({ error: 'Resume not found' });
-    res.setHeader('Content-Type', resume.mimeType);
-    res.setHeader('Content-Disposition', `inline; filename="${resume.filename}"`);
-    res.setHeader('Content-Length', resume.size);
-    res.send(resume.data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Delete resume
-router.delete('/resumes/:resumeId', async (req, res) => {
-  try {
-    await req.prisma.candidateResume.delete({ where: { id: parseInt(req.params.resumeId) } });
-    res.status(204).end();
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

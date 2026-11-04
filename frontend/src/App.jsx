@@ -9,6 +9,7 @@ import ApplicationDetail from './pages/ApplicationDetail';
 import Onboarding from './pages/Onboarding';
 import OnboardingDetail from './pages/OnboardingDetail';
 import Reports from './pages/Reports';
+import ResumeScanner from './pages/ResumeScanner';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/onboarding/:id" element={<OnboardingDetail />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/resume-scanner" element={<ResumeScanner />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>

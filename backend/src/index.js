@@ -7,6 +7,7 @@ const candidatesRouter = require('./routes/candidates');
 const applicationsRouter = require('./routes/applications');
 const onboardingRouter = require('./routes/onboarding');
 const dashboardRouter = require('./routes/dashboard');
+const resumeScannerRouter = require('./routes/resumeScanner');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -25,6 +26,7 @@ app.use('/api/candidates', candidatesRouter);
 app.use('/api/applications', applicationsRouter);
 app.use('/api/onboarding', onboardingRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/resume-scanner', resumeScannerRouter);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
