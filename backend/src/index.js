@@ -15,6 +15,9 @@ const resumeScannerRouter = require('./routes/resumeScanner');
 const prisma = new PrismaClient();
 const app = express();
 
+// ─── Trust Railway's proxy (required for rate limiting + accurate IPs) ──────
+app.set('trust proxy', 1);
+
 // ─── Security headers ──────────────────────────────────────────────────────
 app.use(helmet());
 
