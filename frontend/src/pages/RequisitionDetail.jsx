@@ -276,14 +276,12 @@ export default function RequisitionDetail() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <a
-                      href={api.getRequisitionDocumentUrl(d.id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => api.openRequisitionDocument(d.id).catch(err => alert(err.message))}
                       className="text-xs px-3 py-1 rounded border border-navy text-navy hover:bg-navy hover:text-white transition"
                     >
                       View
-                    </a>
+                    </button>
                     <button
                       onClick={() => handleDeleteDoc(d.id, d.filename)}
                       className="text-xs px-3 py-1 rounded border border-red-300 text-red-500 hover:bg-red-50 transition"

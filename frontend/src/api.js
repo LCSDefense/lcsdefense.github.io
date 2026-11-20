@@ -72,6 +72,17 @@ export const api = {
   },
   deleteResume: (resumeId) => request(`/api/candidates/resumes/${resumeId}`, { method: 'DELETE' }),
   getResumeUrl: (resumeId) => `${API_BASE}/api/candidates/resumes/${resumeId}/file`,
+  openResume: async (resumeId) => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/candidates/resumes/${resumeId}/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (res.status === 401) { clearToken(); window.location.href = '/'; throw new Error('Session expired'); }
+    if (!res.ok) throw new Error('Failed to load file');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  },
 
   // Requisition Documents
   getRequisitionDocuments: (reqId) => request(`/api/requisitions/${reqId}/documents`),
@@ -92,6 +103,17 @@ export const api = {
   },
   deleteRequisitionDocument: (docId) => request(`/api/requisitions/documents/${docId}`, { method: 'DELETE' }),
   getRequisitionDocumentUrl: (docId) => `${API_BASE}/api/requisitions/documents/${docId}/file`,
+  openRequisitionDocument: async (docId) => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/requisitions/documents/${docId}/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (res.status === 401) { clearToken(); window.location.href = '/'; throw new Error('Session expired'); }
+    if (!res.ok) throw new Error('Failed to load file');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  },
 
   // Applications
   getApplications: (params) => {

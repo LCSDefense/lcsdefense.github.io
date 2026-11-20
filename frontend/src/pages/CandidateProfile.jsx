@@ -242,14 +242,12 @@ export default function CandidateProfile() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <a
-                      href={api.getResumeUrl(r.id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => api.openResume(r.id).catch(err => alert(err.message))}
                       className="text-xs px-3 py-1 rounded border border-navy text-navy hover:bg-navy hover:text-white transition"
                     >
                       View
-                    </a>
+                    </button>
                     <button
                       onClick={() => handleDeleteResume(r.id, r.filename)}
                       className="text-xs px-3 py-1 rounded border border-red-300 text-red-500 hover:bg-red-50 transition"
