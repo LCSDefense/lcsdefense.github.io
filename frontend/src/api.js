@@ -58,10 +58,13 @@ export const api = {
   uploadResume: (candidateId, file) => {
     const formData = new FormData();
     formData.append('resume', file);
+    const token = getToken();
     return fetch(`${API_BASE}/api/candidates/${candidateId}/resumes`, {
       method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     }).then(async (res) => {
+      if (res.status === 401) { clearToken(); window.location.href = '/'; throw new Error('Session expired'); }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       return data;
@@ -69,6 +72,26 @@ export const api = {
   },
   deleteResume: (resumeId) => request(`/api/candidates/resumes/${resumeId}`, { method: 'DELETE' }),
   getResumeUrl: (resumeId) => `${API_BASE}/api/candidates/resumes/${resumeId}/file`,
+
+  // Requisition Documents
+  getRequisitionDocuments: (reqId) => request(`/api/requisitions/${reqId}/documents`),
+  uploadRequisitionDocument: (reqId, file) => {
+    const formData = new FormData();
+    formData.append('document', file);
+    const token = getToken();
+    return fetch(`${API_BASE}/api/requisitions/${reqId}/documents`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    }).then(async (res) => {
+      if (res.status === 401) { clearToken(); window.location.href = '/'; throw new Error('Session expired'); }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      return data;
+    });
+  },
+  deleteRequisitionDocument: (docId) => request(`/api/requisitions/documents/${docId}`, { method: 'DELETE' }),
+  getRequisitionDocumentUrl: (docId) => `${API_BASE}/api/requisitions/documents/${docId}/file`,
 
   // Applications
   getApplications: (params) => {

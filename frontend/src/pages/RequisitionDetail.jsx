@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
 
@@ -19,6 +19,7 @@ const STAGE_COLORS = {
 const EMPTY = {
   customer: 'AWS', position: '', hiringManager: '', contract: '', workLocation: '',
   status: 'Open', openSlots: 1, recruiter: '', notes: '', folderLink: '',
+  requiredClearance: '', jobDescription: '', billRate: '', laborCategory: '', idNumber: '', customerPoc: '',
 };
 
 export default function RequisitionDetail() {
@@ -27,17 +28,41 @@ export default function RequisitionDetail() {
   const isNew = !id;
   const [form, setForm] = useState(EMPTY);
   const [applications, setApplications] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [candidateSearch, setCandidateSearch] = useState('');
+  const [candidateResults, setCandidateResults] = useState([]);
+  const [assigning, setAssigning] = useState(false);
+  const docInputRef = useRef(null);
 
   useEffect(() => {
     if (!isNew) {
       api.getRequisition(id).then((data) => {
         setForm(data);
         setApplications(data.applications || []);
+        setDocuments(data.documents || []);
       }).finally(() => setLoading(false));
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!showAssignModal) {
+      setCandidateSearch('');
+      setCandidateResults([]);
+      return;
+    }
+    if (candidateSearch.trim().length < 2) {
+      setCandidateResults([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      api.getCandidates({ search: candidateSearch }).then(setCandidateResults).catch(() => {});
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [candidateSearch, showAssignModal]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -47,7 +72,7 @@ export default function RequisitionDetail() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { applications: _, ...data } = form;
+      const { applications: _, documents: __, ...data } = form;
       if (isNew) {
         const created = await api.createRequisition(data);
         navigate(`/requisitions/${created.id}`, { replace: true });
@@ -59,6 +84,51 @@ export default function RequisitionDetail() {
       alert(err.message);
     }
     setSaving(false);
+  };
+
+  const handleDocUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingDoc(true);
+    try {
+      const uploaded = await api.uploadRequisitionDocument(id, file);
+      setDocuments((prev) => [uploaded, ...prev]);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUploadingDoc(false);
+      if (docInputRef.current) docInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteDoc = async (docId, filename) => {
+    if (!confirm(`Delete "${filename}"?`)) return;
+    try {
+      await api.deleteRequisitionDocument(docId);
+      setDocuments((prev) => prev.filter((d) => d.id !== docId));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleAssignCandidate = async (candidate) => {
+    setAssigning(true);
+    try {
+      await api.createApplication({ candidateId: candidate.id, requisitionId: parseInt(id) });
+      const data = await api.getRequisition(id);
+      setApplications(data.applications || []);
+      setShowAssignModal(false);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const formatBytes = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   if (loading) return <div className="text-center py-12 text-gray-400">Loading...</div>;
@@ -125,6 +195,36 @@ export default function RequisitionDetail() {
             <input name="folderLink" value={form.folderLink || ''} onChange={handleChange}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Required Clearance</label>
+            <input name="requiredClearance" value={form.requiredClearance || ''} onChange={handleChange}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Bill Rate</label>
+            <input name="billRate" value={form.billRate || ''} onChange={handleChange}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Labor Category</label>
+            <input name="laborCategory" value={form.laborCategory || ''} onChange={handleChange}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">ID Number</label>
+            <input name="idNumber" value={form.idNumber || ''} onChange={handleChange}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Customer POC</label>
+            <input name="customerPoc" value={form.customerPoc || ''} onChange={handleChange}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
+          </div>
+        </div>
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-600 mb-1">Job Description</label>
+          <textarea name="jobDescription" value={form.jobDescription || ''} onChange={handleChange} rows={4}
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
         </div>
         <div className="mt-4">
           <label className="block text-sm font-medium text-gray-600 mb-1">Notes</label>
@@ -139,10 +239,117 @@ export default function RequisitionDetail() {
         </div>
       </div>
 
+      {/* Documents Section */}
+      {!isNew && (
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-navy">Documents ({documents.length})</h2>
+            <div>
+              <input
+                ref={docInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleDocUpload}
+              />
+              <button
+                onClick={() => docInputRef.current?.click()}
+                disabled={uploadingDoc}
+                className="bg-navy text-white px-4 py-2 rounded-lg hover:bg-navy/90 transition text-sm disabled:opacity-50"
+              >
+                {uploadingDoc ? 'Uploading...' : '+ Upload Document'}
+              </button>
+            </div>
+          </div>
+          {documents.length === 0 ? (
+            <p className="text-gray-400 text-sm">No documents uploaded.</p>
+          ) : (
+            <div className="space-y-2">
+              {documents.map((d) => (
+                <div key={d.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-light-gray transition">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">📎</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{d.filename}</p>
+                      <p className="text-xs text-gray-400">
+                        {formatBytes(d.size)} · Uploaded {new Date(d.uploadedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={api.getRequisitionDocumentUrl(d.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs px-3 py-1 rounded border border-navy text-navy hover:bg-navy hover:text-white transition"
+                    >
+                      View
+                    </a>
+                    <button
+                      onClick={() => handleDeleteDoc(d.id, d.filename)}
+                      className="text-xs px-3 py-1 rounded border border-red-300 text-red-500 hover:bg-red-50 transition"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Candidate Pipeline */}
       {!isNew && (
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-navy mb-4">Candidate Pipeline ({applications.length})</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-navy">Candidate Pipeline ({applications.length})</h2>
+            <button
+              onClick={() => setShowAssignModal(true)}
+              className="bg-navy text-white px-4 py-2 rounded-lg hover:bg-navy/90 transition text-sm"
+            >
+              + Add Candidate
+            </button>
+          </div>
+
+          {/* Assign Candidate Modal */}
+          {showAssignModal && (
+            <div className="mb-4 p-4 border border-navy/20 rounded-lg bg-blue-50">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-navy">Search for a candidate to assign</p>
+                <button onClick={() => setShowAssignModal(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+              </div>
+              <input
+                type="text"
+                placeholder="Type name, email, or position..."
+                value={candidateSearch}
+                onChange={(e) => setCandidateSearch(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 mb-2"
+                autoFocus
+              />
+              {candidateResults.length > 0 && (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {candidateResults.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleAssignCandidate(c)}
+                      disabled={assigning}
+                      className="w-full text-left px-3 py-2 rounded hover:bg-white transition text-sm flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="font-medium">{c.name}</span>
+                        {c.currentPosition && <span className="text-gray-500 ml-2">· {c.currentPosition}</span>}
+                      </div>
+                      <span className="text-xs text-gray-400">{c.clearanceLevel || 'No clearance'}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {candidateSearch.length >= 2 && candidateResults.length === 0 && (
+                <p className="text-xs text-gray-400">No candidates found</p>
+              )}
+            </div>
+          )}
+
           {applications.length === 0 ? (
             <p className="text-gray-400 text-sm">No candidates yet</p>
           ) : (

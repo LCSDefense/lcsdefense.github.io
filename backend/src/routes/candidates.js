@@ -1,10 +1,11 @@
 const { Router } = require('express');
 const multer = require('multer');
+const { encrypt, decrypt } = require('../crypto');
 const router = Router();
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['application/pdf', 'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -14,9 +15,24 @@ const upload = multer({
   },
 });
 
-// --- Resume file routes (must be BEFORE /:id to avoid Express matching 'resumes' as an id) ---
+function encryptSensitive(data) {
+  const out = { ...data };
+  if (out.ssn !== undefined) out.ssn = encrypt(out.ssn);
+  if (out.dob !== undefined) out.dob = encrypt(out.dob);
+  return out;
+}
 
-// Download resume file
+function decryptSensitive(candidate) {
+  if (!candidate) return candidate;
+  return {
+    ...candidate,
+    ssn: candidate.ssn ? decrypt(candidate.ssn) : candidate.ssn,
+    dob: candidate.dob ? decrypt(candidate.dob) : candidate.dob,
+  };
+}
+
+// Resume file routes (must be BEFORE /:id)
+
 router.get('/resumes/:resumeId/file', async (req, res) => {
   try {
     const resume = await req.prisma.candidateResume.findUnique({
@@ -33,7 +49,6 @@ router.get('/resumes/:resumeId/file', async (req, res) => {
   }
 });
 
-// Delete resume
 router.delete('/resumes/:resumeId', async (req, res) => {
   try {
     await req.prisma.candidateResume.delete({ where: { id: parseInt(req.params.resumeId) } });
@@ -43,7 +58,7 @@ router.delete('/resumes/:resumeId', async (req, res) => {
   }
 });
 
-// List candidates
+// List candidates (SSN not returned in list)
 router.get('/', async (req, res) => {
   try {
     const { search, clearance } = req.query;
@@ -62,7 +77,8 @@ router.get('/', async (req, res) => {
       include: { applications: { select: { id: true, pipelineStage: true, requisition: { select: { position: true, customer: true } } } } },
       orderBy: { createdAt: 'desc' },
     });
-    res.json(candidates);
+    // Omit SSN from list view, decrypt DOB
+    res.json(candidates.map(c => ({ ...c, ssn: undefined, dob: c.dob ? decrypt(c.dob) : c.dob })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -71,14 +87,14 @@ router.get('/', async (req, res) => {
 // Create candidate
 router.post('/', async (req, res) => {
   try {
-    const candidate = await req.prisma.candidate.create({ data: req.body });
-    res.status(201).json(candidate);
+    const candidate = await req.prisma.candidate.create({ data: encryptSensitive(req.body) });
+    res.status(201).json(decryptSensitive(candidate));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-// Get candidate
+// Get candidate (full detail with decrypted sensitive fields)
 router.get('/:id', async (req, res) => {
   try {
     const candidate = await req.prisma.candidate.findUnique({
@@ -89,7 +105,7 @@ router.get('/:id', async (req, res) => {
       },
     });
     if (!candidate) return res.status(404).json({ error: 'Not found' });
-    res.json(candidate);
+    res.json(decryptSensitive(candidate));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -100,9 +116,9 @@ router.put('/:id', async (req, res) => {
   try {
     const candidate = await req.prisma.candidate.update({
       where: { id: parseInt(req.params.id) },
-      data: req.body,
+      data: encryptSensitive(req.body),
     });
-    res.json(candidate);
+    res.json(decryptSensitive(candidate));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -118,9 +134,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// --- Resume endpoints ---
-
-// List resumes for a candidate (metadata only)
+// List resumes for a candidate
 router.get('/:id/resumes', async (req, res) => {
   try {
     const resumes = await req.prisma.candidateResume.findMany({
@@ -148,11 +162,8 @@ router.post('/:id/resumes', upload.single('resume'), async (req, res) => {
       },
     });
     res.status(201).json({
-      id: resume.id,
-      filename: resume.filename,
-      mimeType: resume.mimeType,
-      size: resume.size,
-      uploadedAt: resume.uploadedAt,
+      id: resume.id, filename: resume.filename, mimeType: resume.mimeType,
+      size: resume.size, uploadedAt: resume.uploadedAt,
     });
   } catch (err) {
     res.status(400).json({ error: err.message });

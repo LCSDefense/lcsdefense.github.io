@@ -7,7 +7,7 @@ const CLEARANCES = ['None', 'Secret', 'TS', 'TS/SCI', 'TS/SCI w/FSP'];
 const EMPTY = {
   name: '', email: '', phone: '', homeAddress: '', currentPosition: '', currentCompany: '',
   clearanceLevel: 'None', clearanceConfirmedBy: '', salaryExpectation: '', sourcedBy: '',
-  resumeLink: '', linkedInUrl: '', notes: '',
+  resumeLink: '', linkedInUrl: '', notes: '', securityNotes: '', dob: '', ssn: '',
 };
 
 export default function CandidateProfile() {
@@ -20,6 +20,7 @@ export default function CandidateProfile() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
   const [uploading, setUploading] = useState(false);
+  const [showSsn, setShowSsn] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -143,6 +144,29 @@ export default function CandidateProfile() {
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Date of Birth</label>
+            <input name="dob" value={form.dob || ''} onChange={handleChange} type="text" placeholder="MM/DD/YYYY"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">SSN 🔒</label>
+            <div className="flex gap-2">
+              {showSsn || !form.ssn ? (
+                <input name="ssn" value={form.ssn || ''} onChange={handleChange} type="text" placeholder="XXX-XX-XXXX"
+                  className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
+              ) : (
+                <input value="***-**-****" readOnly
+                  className="flex-1 border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
+              )}
+              {form.ssn && (
+                <button type="button" onClick={() => setShowSsn((v) => !v)}
+                  className="px-3 py-2 text-xs border rounded-lg text-gray-600 hover:bg-gray-50 transition whitespace-nowrap">
+                  {showSsn ? 'Hide' : 'Show'}
+                </button>
+              )}
+            </div>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">Sourced By</label>
             <input name="sourcedBy" value={form.sourcedBy || ''} onChange={handleChange}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
@@ -166,6 +190,11 @@ export default function CandidateProfile() {
         <div className="mt-4">
           <label className="block text-sm font-medium text-gray-600 mb-1">Notes</label>
           <textarea name="notes" value={form.notes || ''} onChange={handleChange} rows={3}
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
+        </div>
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-600 mb-1">Security Notes 🔒</label>
+          <textarea name="securityNotes" value={form.securityNotes || ''} onChange={handleChange} rows={3}
             className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
         </div>
         <div className="mt-4">

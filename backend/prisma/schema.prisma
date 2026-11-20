@@ -18,12 +18,19 @@ model Requisition {
   status        String    @default("Open")
   openSlots     Int       @default(1)
   recruiter     String?
-  notes         String?
-  folderLink    String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  applications  Application[]
-  scanSessions  ResumeSession[]
+  notes              String?
+  folderLink         String?
+  requiredClearance  String?
+  jobDescription     String?  @db.Text
+  billRate           String?
+  laborCategory      String?
+  idNumber           String?
+  customerPoc        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  applications       Application[]
+  scanSessions       ResumeSession[]
+  documents          RequisitionDocument[]
 }
 
 model Candidate {
@@ -42,6 +49,9 @@ model Candidate {
   resumeLink            String?
   linkedInUrl           String?
   notes                 String?
+  securityNotes         String?  @db.Text
+  dob                   String?
+  ssn                   String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
   applications          Application[]
@@ -181,6 +191,17 @@ model CandidateResume {
   size        Int
   data        Bytes
   uploadedAt  DateTime  @default(now())
+}
+
+model RequisitionDocument {
+  id            Int       @id @default(autoincrement())
+  requisitionId Int
+  requisition   Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  filename      String
+  mimeType      String
+  size          Int
+  data          Bytes
+  uploadedAt    DateTime  @default(now())
 }
 
 model ChecklistItem {
