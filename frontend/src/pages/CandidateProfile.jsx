@@ -72,7 +72,7 @@ export default function CandidateProfile() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { applications: _, ...data } = form;
+      const { applications: _, resumes: __, scanResults: ___, ...data } = form;
       if (isNew) {
         const created = await api.createCandidate(data);
         navigate(`/candidates/${created.id}`, { replace: true });

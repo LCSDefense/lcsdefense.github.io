@@ -15,8 +15,22 @@ const upload = multer({
   },
 });
 
+const CANDIDATE_SCALAR_FIELDS = [
+  'name','email','phone','homeAddress','currentPosition','currentCompany',
+  'clearanceLevel','clearanceConfirmedBy','clearanceConfirmDate','salaryExpectation',
+  'sourcedBy','resumeLink','linkedInUrl','notes','securityNotes','dob','ssn',
+];
+
+function pickCandidateFields(data) {
+  const out = {};
+  for (const key of CANDIDATE_SCALAR_FIELDS) {
+    if (key in data) out[key] = data[key];
+  }
+  return out;
+}
+
 function encryptSensitive(data) {
-  const out = { ...data };
+  const out = pickCandidateFields(data);
   if (out.ssn !== undefined) out.ssn = encrypt(out.ssn);
   if (out.dob !== undefined) out.dob = encrypt(out.dob);
   return out;
