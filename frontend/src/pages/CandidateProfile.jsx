@@ -5,7 +5,7 @@ import { api } from '../api';
 const CLEARANCES = ['None', 'Secret', 'TS', 'TS/SCI', 'TS/SCI w/FSP'];
 
 const EMPTY = {
-  name: '', email: '', phone: '', homeAddress: '', currentPosition: '', currentCompany: '',
+  name: '', email: '', phone: '', homeAddress: '',
   clearanceLevel: 'None', clearanceConfirmedBy: '', salaryExpectation: '', sourcedBy: '',
   resumeLink: '', linkedInUrl: '', notes: '', securityNotes: '', dob: '', ssn: '',
 };
@@ -116,16 +116,7 @@ export default function CandidateProfile() {
             <input name="phone" value={form.phone || ''} onChange={handleChange}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Current Position</label>
-            <input name="currentPosition" value={form.currentPosition || ''} onChange={handleChange}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Current Company</label>
-            <input name="currentCompany" value={form.currentCompany || ''} onChange={handleChange}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
-          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">Clearance Level</label>
             <select name="clearanceLevel" value={form.clearanceLevel || 'None'} onChange={handleChange}

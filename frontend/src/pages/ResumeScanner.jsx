@@ -422,12 +422,11 @@ export default function ResumeScanner() {
         form.append('jobDescFile', jdFile);
       } else if (jdSource === 'requisition') {
         if (!selectedReqId) throw new Error('Please select a requisition');
-        form.append('requisitionId', selectedReqId);
-        // Get JD from the selected requisition's applications if available, or use the position/notes as JD
         const req = requisitions.find((r) => String(r.id) === String(selectedReqId));
-        if (req) {
-          form.append('jobDescText', `Position: ${req.position}\nCustomer: ${req.customer}\nLocation: ${req.workLocation || ''}\nContract: ${req.contract || ''}\nNotes: ${req.notes || ''}`);
-        }
+        if (!req) throw new Error('Selected requisition not found');
+        if (!req.jobDescription) throw new Error('The selected requisition has no Job Description. Please add one first or use Paste/Type.');
+        form.append('requisitionId', selectedReqId);
+        form.append('jobDescText', req.jobDescription);
       }
 
       // Resumes
@@ -567,18 +566,34 @@ export default function ResumeScanner() {
             )}
 
             {jdSource === 'requisition' && (
-              <select
-                value={selectedReqId}
-                onChange={(e) => setSelectedReqId(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold"
-              >
-                <option value="">Select a requisition…</option>
-                {requisitions.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.position} — {r.customer}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-3">
+                <select
+                  value={selectedReqId}
+                  onChange={(e) => setSelectedReqId(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold"
+                >
+                  <option value="">Select a requisition…</option>
+                  {requisitions.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.position} — {r.customer}{r.jobDescription ? '' : ' (no job description)'}
+                    </option>
+                  ))}
+                </select>
+                {selectedReqId && (() => {
+                  const req = requisitions.find((r) => String(r.id) === String(selectedReqId));
+                  if (!req) return null;
+                  return req.jobDescription ? (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Job Description Preview</p>
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap line-clamp-6">{req.jobDescription}</p>
+                    </div>
+                  ) : (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
+                      ⚠️ This requisition has no Job Description set. <a href={`/requisitions/${req.id}`} className="underline">Add one</a>, or use Paste/Type instead.
+                    </div>
+                  );
+                })()}
+              </div>
             )}
           </div>
 
