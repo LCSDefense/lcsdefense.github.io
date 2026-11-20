@@ -21,6 +21,7 @@ export default function CandidateProfile() {
   const [loading, setLoading] = useState(!isNew);
   const [uploading, setUploading] = useState(false);
   const [showSsn, setShowSsn] = useState(false);
+  const [showSecurityNotes, setShowSecurityNotes] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -140,7 +141,7 @@ export default function CandidateProfile() {
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">SSN 🔒</label>
+            <label className="block text-sm font-medium text-gray-600 mb-1">SSN</label>
             <div className="flex gap-2">
               {showSsn || !form.ssn ? (
                 <input name="ssn" value={form.ssn || ''} onChange={handleChange} type="text" placeholder="XXX-XX-XXXX"
@@ -184,9 +185,21 @@ export default function CandidateProfile() {
             className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
         </div>
         <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-600 mb-1">Security Notes 🔒</label>
-          <textarea name="securityNotes" value={form.securityNotes || ''} onChange={handleChange} rows={3}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-gray-600">Security Notes</label>
+            {form.securityNotes && (
+              <button type="button" onClick={() => setShowSecurityNotes((v) => !v)}
+                className="text-xs px-2 py-0.5 border rounded text-gray-600 hover:bg-gray-50 transition">
+                {showSecurityNotes ? 'Hide' : 'Show'}
+              </button>
+            )}
+          </div>
+          {showSecurityNotes || !form.securityNotes ? (
+            <textarea name="securityNotes" value={form.securityNotes || ''} onChange={handleChange} rows={3}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30" />
+          ) : (
+            <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 select-none" style={{minHeight:'4.5rem'}}>••••••••••••••••••••</div>
+          )}
         </div>
         <div className="mt-4">
           <button onClick={handleSave} disabled={saving}
