@@ -4,17 +4,195 @@ import { api } from '../api';
 
 const CUSTOMERS = ['AWS', 'NSA', 'C5ISR', 'Army G6', 'TAC', 'Raven', 'Other'];
 const STATUSES = ['Open', 'Filled', 'On Hold', 'Cancelled'];
+const PIPELINE_STAGES = [
+  'Initial Contact', 'Interested', 'LCS Interview', 'Sent to Client',
+  'Client Interview', 'Customer Approved', 'Offer', 'Hired', 'Customer Rejected', 'Rejected', 'Withdrawn',
+];
 const STAGE_COLORS = {
   'Initial Contact': 'bg-gray-200 text-gray-700',
   'Interested': 'bg-blue-100 text-blue-700',
   'LCS Interview': 'bg-yellow-100 text-yellow-700',
   'Sent to Client': 'bg-purple-100 text-purple-700',
   'Client Interview': 'bg-orange-100 text-orange-700',
+  'Customer Approved': 'bg-green-100 text-green-700',
   'Offer': 'bg-green-100 text-green-700',
   'Hired': 'bg-green-200 text-green-800',
+  'Customer Rejected': 'bg-red-100 text-red-700',
   'Rejected': 'bg-red-100 text-red-700',
   'Withdrawn': 'bg-gray-300 text-gray-600',
 };
+
+const STAGE_DATE_FIELD = {
+  'Initial Contact': 'dateInitialContact',
+  'Interested': 'dateInterested',
+  'LCS Interview': 'dateLCSInterview',
+  'Sent to Client': 'dateSentToClient',
+  'Client Interview': 'dateClientInterview',
+  'Customer Approved': 'dateClientInterview',
+  'Offer': 'dateOffer',
+  'Hired': 'dateFilled',
+};
+
+const DATE_LABELS = [
+  { field: 'dateInitialContact', label: 'Initial Contact' },
+  { field: 'dateInterested', label: 'Interested' },
+  { field: 'dateLCSInterview', label: 'LCS Interview' },
+  { field: 'dateSentToClient', label: 'Sent to Client' },
+  { field: 'dateClientInterview', label: 'Client Interview' },
+  { field: 'dateOffer', label: 'Offer' },
+  { field: 'dateFilled', label: 'Hired / Filled' },
+];
+
+function toDateInput(val) {
+  if (!val) return '';
+  return new Date(val).toISOString().slice(0, 10);
+}
+
+function CandidateRow({ app: initialApp, onSaved }) {
+  const [expanded, setExpanded] = useState(false);
+  const [app, setApp] = useState(initialApp);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  const update = (field, value) => {
+    setApp((prev) => ({ ...prev, [field]: value }));
+    setDirty(true);
+  };
+
+  const handleStageChange = (stage) => {
+    const dateField = STAGE_DATE_FIELD[stage];
+    setApp((prev) => ({
+      ...prev,
+      pipelineStage: stage,
+      ...(dateField && !prev[dateField] ? { [dateField]: new Date().toISOString() } : {}),
+    }));
+    setDirty(true);
+  };
+
+  const handleDateChange = (field, value) => {
+    update(field, value ? new Date(value).toISOString() : null);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { candidate, requisition, onboardingRecord, id: _id, createdAt, updatedAt, ...data } = app;
+      await api.updateApplication(app.id, data);
+      setDirty(false);
+      if (onSaved) onSaved();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border border-gray-100 rounded-lg overflow-hidden">
+      <button
+        className="w-full flex items-center justify-between p-3 hover:bg-slate-50 transition text-left"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-gray-400 text-xs">{expanded ? '▼' : '▶'}</span>
+          <div>
+            <p className="font-medium text-sm text-gray-900">{app.candidate?.name}</p>
+            <p className="text-xs text-gray-400">
+              {app.candidate?.clearanceLevel || 'No clearance'}{app.recruiter ? ` · ${app.recruiter}` : ''}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {dirty && <span className="text-xs text-amber-500 font-medium">Unsaved</span>}
+          <span className={`text-xs px-2 py-1 rounded-full ${STAGE_COLORS[app.pipelineStage] || 'bg-gray-100'}`}>
+            {app.pipelineStage}
+          </span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-gray-100 bg-slate-50/50 p-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Pipeline Stage</label>
+              <select
+                value={app.pipelineStage}
+                onChange={(e) => handleStageChange(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 bg-white"
+              >
+                {PIPELINE_STAGES.map((s) => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Recruiter</label>
+              <input
+                value={app.recruiter || ''}
+                onChange={(e) => update('recruiter', e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 bg-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-2">Stage Dates</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {DATE_LABELS.map(({ field, label }) => (
+                <div key={field}>
+                  <label className="block text-xs text-gray-400 mb-1">{label}</label>
+                  <input
+                    type="date"
+                    value={toDateInput(app[field])}
+                    onChange={(e) => handleDateChange(field, e.target.value)}
+                    className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-navy/30 bg-white"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Comments / Notes</label>
+            <textarea
+              value={app.internalNotes || ''}
+              onChange={(e) => update('internalNotes', e.target.value)}
+              rows={3}
+              placeholder="Add notes, comments, or status details..."
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 bg-white resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Offer Amount</label>
+            <input
+              value={app.offerAmount || ''}
+              onChange={(e) => update('offerAmount', e.target.value)}
+              placeholder="e.g. $185,000"
+              className="w-full sm:w-56 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 bg-white"
+            />
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={handleSave}
+              disabled={saving || !dirty}
+              className="bg-navy text-white px-4 py-1.5 rounded-lg hover:bg-navy/90 transition text-sm disabled:opacity-40"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+            <Link to={`/applications/${app.id}`} className="text-xs text-navy hover:underline">
+              Full detail →
+            </Link>
+            {app.pipelineStage === 'Hired' && app.onboardingRecord && (
+              <Link to={`/onboarding/${app.onboardingRecord.id}`} className="text-xs text-green-600 hover:underline">
+                📋 Onboarding →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const EMPTY = {
   customer: 'AWS', position: '', hiringManager: '', contract: '', workLocation: '',
@@ -351,23 +529,13 @@ export default function RequisitionDetail() {
           {applications.length === 0 ? (
             <p className="text-gray-400 text-sm">No candidates yet</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {applications.map((app) => (
-                <Link
+                <CandidateRow
                   key={app.id}
-                  to={`/applications/${app.id}`}
-                  className="flex items-center justify-between p-3 rounded hover:bg-light-gray transition block"
-                >
-                  <div>
-                    <p className="font-medium text-sm">{app.candidate.name}</p>
-                    <p className="text-xs text-gray-500">
-                      {app.candidate.clearanceLevel || 'No clearance'} • {app.candidate.currentPosition || 'N/A'}
-                    </p>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${STAGE_COLORS[app.pipelineStage] || 'bg-gray-100'}`}>
-                    {app.pipelineStage}
-                  </span>
-                </Link>
+                  app={app}
+                  onSaved={() => api.getRequisition(id).then((data) => setApplications(data.applications || []))}
+                />
               ))}
             </div>
           )}
